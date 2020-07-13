@@ -10,6 +10,7 @@ Clip 1,1 - Media Next
 
 */
 
+// Uncomment this to see debug messages (logs all incoming MIDI messages and processed inputs)
 //#define APC40_DEBUG_MSGS
 
 #include <iostream>
@@ -102,6 +103,13 @@ int main()
 
 void OnAPC40Input(double deltatime, std::vector< unsigned char >* message, void*)
 {
+    #if defined APC40_DEBUG_MSGS
+
+    if(message.size() == 3)
+        std::cout << "Byte1: 0x" << std::hex << message[0] << " Byte2: 0x" << std::hex << message[1] << " Byte3: 0x" << std::hex << message[2] << "\n";
+
+    #endif
+
     APC40Input input = APC40->GetInputFromMIDIMessage(deltatime, message);
 
     switch (input.type)
