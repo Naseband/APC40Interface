@@ -1,10 +1,10 @@
 # APC40Interface
 
-C++ Library to interact with the Akai APC 40 (portable MIDI controller).
+C++ Library to interact with the Akai APC 40 (portable MIDI controller). There is great support for Ableton, Tractor, FL Studio etc. so this is not meant for those. This is to play around with it without digging into the protocols.
 
 Uses the RtMidi Library.
 
-The launch pad is treated as one array of buttons/LEDs, including scene launch and activator/solo/rec arm buttons. This is to make the usage of LEDs easier for use cases other than MIDI controller.
+The launch pad is treated as one array of buttons/LEDs, including scene launch and activator/solo/rec arm buttons. This is to make the usage of LEDs easier for use cases other than a MIDI controller.
 They are accessed with x and y positions; the origin is located in the top left corner.
 To access the pad buttons and LEDs use the "APC40_MAIN_PAD" type.
 
