@@ -46,7 +46,7 @@ enum
 	APC40_SLIDER_CH6,
 	APC40_SLIDER_CH7,
 	APC40_SLIDER_CH8,
-	APC40_SLIDER_CH_MASTER,
+	APC40_SLIDER_MASTER,
 	APC40_SLIDER_CROSSFADE,
 
 	APC40_KNOB_CUE_LEVEL,
@@ -85,9 +85,10 @@ enum eAPC40LEDModes
 struct APC40Input
 {
 	int type;
-	int x;
-	int y;
-	int value;
+	unsigned char x;
+	unsigned char y;
+	unsigned char value;
+	bool pressed;
 };
 
 // ------------------------------------------------------------ 
@@ -211,12 +212,21 @@ public:
 		unsigned int nBytes = message->size();
 
 		int type = -1, x = 0, y = 0, value = 0;
+		bool pressed = true;
 
 		if (nBytes == 3)
 		{
 			int b1 = (int)message->at(0);
 			int b2 = (int)message->at(1);
-			int b3 = (int)message->at(2); 
+			int b3 = (int)message->at(2);
+
+			if (b1 >= 0x80 && b1 <= 0x8F)
+			{
+				b1 += 0x10;
+				pressed = false;
+			}
+
+			// Main Pad
 
 			if (b1 >= 0x90 && b1 <= 0x97 && b2 >= 0x34 && b2 <= 0x39) // Clips
 			{
@@ -258,24 +268,233 @@ public:
 				x = b1 - 0x90;
 				y = 9 - (b2 - 0x30);
 			}
-			else if (b1 == 0xB0 && b2 == 0x2F) // Cue Level
+			else if (b1 == 0x90 && b2 == 0x57) // Track Control
+			{
+				type = APC40_BUTTON_TRACK_PAN;
+			}
+			else if (b1 == 0x90 && b2 == 0x58)
+			{
+				type = APC40_BUTTON_TRACK_SEND_A;
+			}
+			else if (b1 == 0x90 && b2 == 0x59)
+			{
+				type = APC40_BUTTON_TRACK_SEND_B;
+			}
+			else if (b1 == 0x90 && b2 == 0x5A)
+			{
+				type = APC40_BUTTON_TRACK_SEND_C;
+			}
+			else if (b1 == 0xB0 && b2 == 0x30)
+			{
+				type = APC40_KNOB_TRACK1;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x31)
+			{
+				type = APC40_KNOB_TRACK2;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x32)
+			{
+				type = APC40_KNOB_TRACK3;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x33)
+			{
+				type = APC40_KNOB_TRACK4;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x34)
+			{
+				type = APC40_KNOB_TRACK5;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x35)
+			{
+				type = APC40_KNOB_TRACK6;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x36)
+			{
+				type = APC40_KNOB_TRACK7;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x37)
+			{
+				type = APC40_KNOB_TRACK8;
+				value = b3;
+			}
+			else if (b1 == 0x90 && b2 == 0x3A) // Device Control
+			{
+				type = APC40_BUTTON_DEVICE_CLIP_TRACK;
+			}
+			else if (b1 == 0x90 && b2 == 0x3B)
+			{
+				type = APC40_BUTTON_DEVICE_TOGGLE;
+			}
+			else if (b1 == 0x90 && b2 == 0x3C)
+			{
+				type = APC40_BUTTON_DEVICE_LEFT;
+			}
+			else if (b1 == 0x90 && b2 == 0x3D)
+			{
+				type = APC40_BUTTON_DEVICE_RIGHT;
+			}
+			else if (b1 == 0xB0 && b2 == 0x10)
+			{
+				type = APC40_KNOB_DEVICE1;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x11)
+			{
+				type = APC40_KNOB_DEVICE2;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x12)
+			{
+				type = APC40_KNOB_DEVICE3;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x13)
+			{
+				type = APC40_KNOB_DEVICE4;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x14)
+			{
+				type = APC40_KNOB_DEVICE5;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x15)
+			{
+				type = APC40_KNOB_DEVICE6;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x16)
+			{
+				type = APC40_KNOB_DEVICE7;
+				value = b3;
+			}
+			else if (b1 == 0xB0 && b2 == 0x17)
+			{
+				type = APC40_KNOB_DEVICE8;
+				value = b3;
+			}
+			else if (b1 == 0x90 && b2 == 0x3E) // Misc
+			{
+				type = APC40_BUTTON_DETAIL_VIEW;
+			}
+			else if (b1 == 0x90 && b2 == 0x3F)
+			{
+				type = APC40_BUTTON_REC_QUANTIZATION;
+			}
+			else if (b1 == 0x90 && b2 == 0x40)
+			{
+				type = APC40_BUTTON_MIDI_OVERDUB;
+			}
+			else if (b1 == 0x90 && b2 == 0x41)
+			{
+				type = APC40_BUTTON_METRONOME;
+			}
+			else if (b1 == 0x90 && b2 == 0x62)
+			{
+				type = APC40_BUTTON_SHIFT;
+			}
+			else if (b1 == 0x90 && b2 == 0x61)
+			{
+				type = APC40_BUTTON_BANK_LEFT;
+			}
+			else if (b1 == 0x90 && b2 == 0x60)
+			{
+				type = APC40_BUTTON_BANK_RIGHT;
+			}
+			else if (b1 == 0x90 && b2 == 0x5E)
+			{
+				type = APC40_BUTTON_BANK_UP;
+			}
+			else if (b1 == 0x90 && b2 == 0x5F)
+			{
+				type = APC40_BUTTON_BANK_DOWN;
+			}
+			else if (b1 == 0x90 && b2 == 0x63)
+			{
+				type = APC40_BUTTON_TAP_TEMPO;
+			}
+			else if (b1 == 0x90 && b2 == 0x65)
+			{
+				type = APC40_BUTTON_NUDGE_N;
+			}
+			else if (b1 == 0x90 && b2 == 0x64)
+			{
+				type = APC40_BUTTON_NUDGE_P;
+			}
+			else if (b1 == 0x90 && b2 == 0x5B)
+			{
+				type = APC40_BUTTON_PLAY;
+			}
+			else if (b1 == 0x90 && b2 == 0x5C)
+			{
+				type = APC40_BUTTON_STOP;
+			}
+			else if (b1 == 0x90 && b2 == 0x5D)
+			{
+				type = APC40_BUTTON_REC;
+			}
+			else if (b1 == 0xB0 && b2 == 0x2F)
 			{
 				type = APC40_KNOB_CUE_LEVEL;
 
 				value = b3;
 			}
-			else if (b1 == 0x90 && b2 == 0x62) // Shift
+			else if (b1 == 0xB0 && b2 == 0x07)
 			{
-				type = APC40_BUTTON_SHIFT; 
+				type = APC40_SLIDER_CH1;
+			}
+			else if (b1 == 0xB1 && b2 == 0x07)
+			{
+				type = APC40_SLIDER_CH2;
+			}
+			else if (b1 == 0xB2 && b2 == 0x07)
+			{
+				type = APC40_SLIDER_CH3;
+			}
+			else if (b1 == 0xB3 && b2 == 0x07)
+			{
+				type = APC40_SLIDER_CH4;
+			}
+			else if (b1 == 0xB4 && b2 == 0x07)
+			{
+				type = APC40_SLIDER_CH5;
+			}
+			else if (b1 == 0xB5 && b2 == 0x07)
+			{
+				type = APC40_SLIDER_CH6;
+			}
+			else if (b1 == 0xB6 && b2 == 0x07)
+			{
+				type = APC40_SLIDER_CH7;
+			}
+			else if (b1 == 0xB7 && b2 == 0x07)
+			{
+				type = APC40_SLIDER_CH8;
+			}
+			else if (b1 == 0xB0 && b2 == 0x0E)
+			{
+				type = APC40_SLIDER_MASTER;
+			}
+			else if (b1 == 0xB0 && b2 == 0x0F)
+			{
+				type = APC40_SLIDER_CROSSFADE;
 			}
 		}
 
 		APC40Input input;
 
 		input.type = type;
-		input.x = x;
-		input.y = y;
-		input.value = value;
+		input.x = (unsigned char)x;
+		input.y = (unsigned char)y;
+		input.value = (unsigned char)value;
+		input.pressed = pressed;
 
 		return input;
 	}
@@ -292,7 +511,7 @@ public:
 		case APC40_MAIN_PAD:
 			if (x < 0 || x > 8 || y < 0 || y > 9)
 				return false;
-
+			
 			if (x >= 0 && x <= 7 && y >= 0 && y <= 4) // Clip Launch
 			{
 				b1 = 0x90 + x;
