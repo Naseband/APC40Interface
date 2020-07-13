@@ -216,13 +216,7 @@ public:
 		{
 			int b1 = (int)message->at(0);
 			int b2 = (int)message->at(1);
-			int b3 = (int)message->at(2);
-
-			#if defined APC40_DEBUG_MSGS
-
-			std::cout << "b1: 0x" << std::hex << b1 << " b2: 0x" << std::hex << b2 << " b3: 0x" << std::hex << b3 << "\n";
-
-			#endif  
+			int b3 = (int)message->at(2); 
 
 			if (b1 >= 0x90 && b1 <= 0x97 && b2 >= 0x34 && b2 <= 0x39) // Clips
 			{
