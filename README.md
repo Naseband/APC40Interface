@@ -18,4 +18,5 @@ All other buttons, knobs and sliders have a corresponding definition.
 # Credits
 
 APC40 documentation: https://www.akaipro.de/sites/default/files/2018-01/APC40_Communications_Protocol_rev_1.pdf_1db97c1fdba23bacf47df0f9bf64e913.pdf
+
 RtMidi: https://www.music.mcgill.ca/~gary/rtmidi/
