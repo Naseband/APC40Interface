@@ -1,6 +1,6 @@
 # APC40Interface
 
-C++ Library to interact with the Akai APC 40 (portable MIDI controller). There is great support for Ableton, Tractor, FL Studio etc. so this is not meant for those. This is to play around with it without digging into the protocols.
+C++ Library to interact with the Akai APC 40 (portable MIDI controller).
 
 Uses the RtMidi Library.
 
