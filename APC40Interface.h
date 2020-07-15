@@ -1,12 +1,18 @@
 #pragma once
 
+/*
+
+APC40 Interface Library (c) 2020 
+
+*/
+
 #include  <RtMidi.h>
 
 // ------------------------------------------------------------ Definitions
 
 enum
 {
-	APC40_MAIN_PAD,
+	APC40_BUTTON_PAD, // All rubber buttons, including scene launch, solo, etc. (identified by x,y coordinates)
 
 	APC40_BUTTON_TRACK_PAN,
 	APC40_BUTTON_TRACK_SEND_A,
@@ -28,11 +34,10 @@ enum
 	APC40_BUTTON_DEVICE_TOGGLE,
 	APC40_BUTTON_DEVICE_LEFT,
 	APC40_BUTTON_DEVICE_RIGHT,
-
-	APC40_BUTTON_DETAIL_VIEW,
-	APC40_BUTTON_REC_QUANTIZATION,
-	APC40_BUTTON_MIDI_OVERDUB,
-	APC40_BUTTON_METRONOME,
+	APC40_BUTTON_DEVICE_DETAIL_VIEW,
+	APC40_BUTTON_DEVICE_REC_QUANTIZATION,
+	APC40_BUTTON_DEVICE_MIDI_OVERDUB,
+	APC40_BUTTON_DEVICE_METRONOME,
 
 	APC40_BUTTON_PLAY,
 	APC40_BUTTON_STOP,
@@ -93,7 +98,7 @@ struct APC40Input
 
 // ------------------------------------------------------------ 
 
-template <typename T>
+//template <>
 class APC40Interface 
 {
 private:
@@ -188,14 +193,37 @@ public:
 		m_pRtMidiOut->sendMessage(&message);
 	}
 
-	void ResetLEDs()
+	void ResetLEDs(bool main_pad = true, bool track = true, bool device = true)
 	{
-		for (int x = 0; x < 9; x++)
+		if (main_pad)
 		{
-			for (int y = 0; y < 10; y++)
+			for (int x = 0; x < 9; x++)
 			{
-				this->SetLEDMode(APC40_MAIN_PAD, x, y, APC40_LED_MODE_OFF);
+				for (int y = 0; y < 10; y++)
+				{
+					this->SetLEDMode(APC40_BUTTON_PAD, x, y, APC40_LED_MODE_OFF);
+				}
 			}
+		}
+
+		if (track)
+		{
+			this->SetLEDMode(APC40_BUTTON_TRACK_PAN, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_TRACK_SEND_A, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_TRACK_SEND_B, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_TRACK_SEND_C, APC40_LED_MODE_OFF);
+		}
+
+		if (device)
+		{
+			this->SetLEDMode(APC40_BUTTON_DEVICE_CLIP_TRACK, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_DEVICE_TOGGLE, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_DEVICE_LEFT, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_DEVICE_RIGHT, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_DEVICE_DETAIL_VIEW, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_DEVICE_REC_QUANTIZATION, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_DEVICE_MIDI_OVERDUB, APC40_LED_MODE_OFF);
+			this->SetLEDMode(APC40_BUTTON_DEVICE_METRONOME, APC40_LED_MODE_OFF);
 		}
 	}
 
@@ -230,7 +258,7 @@ public:
 
 			if (b1 >= 0x90 && b1 <= 0x97 && b2 >= 0x34 && b2 <= 0x39) // Clips
 			{
-				type = APC40_MAIN_PAD;
+				type = APC40_BUTTON_PAD;
 				x = b1 - 0x90;
 				y = b2 - 0x35;
 
@@ -239,7 +267,7 @@ public:
 			}
 			else if (b1 == 0x90 && b2 >= 0x51 && b2 <= 0x56) // Scene Launch + Stop All Clips
 			{
-				type = APC40_MAIN_PAD;
+				type = APC40_BUTTON_PAD;
 
 				x = 8;
 				y = b2 - 0x52;
@@ -249,21 +277,21 @@ public:
 			}
 			else if (b1 >= 0x90 && b1 <= 0x97 && b2 == 0x33) // Track Selection
 			{
-				type = APC40_MAIN_PAD;
+				type = APC40_BUTTON_PAD;
 
 				x = b1 - 0x90;
 				y = 6;
 			}
 			else if (b1 == 0x90 && b2 == 0x50) // Master
 			{
-				type = APC40_MAIN_PAD;
+				type = APC40_BUTTON_PAD;
 
 				x = 8;
 				y = 6;
 			}
 			else if (b1 >= 0x90 && b1 <= 0x97 && b2 >= 0x30 && b2 <= 0x32) // Activator, Solo, Rec Arm
 			{
-				type = APC40_MAIN_PAD;
+				type = APC40_BUTTON_PAD;
 
 				x = b1 - 0x90;
 				y = 9 - (b2 - 0x30);
@@ -340,6 +368,22 @@ public:
 			{
 				type = APC40_BUTTON_DEVICE_RIGHT;
 			}
+			else if (b1 == 0x90 && b2 == 0x3E)
+			{
+			type = APC40_BUTTON_DEVICE_DETAIL_VIEW;
+			}
+			else if (b1 == 0x90 && b2 == 0x3F)
+			{
+			type = APC40_BUTTON_DEVICE_REC_QUANTIZATION;
+			}
+			else if (b1 == 0x90 && b2 == 0x40)
+			{
+			type = APC40_BUTTON_DEVICE_MIDI_OVERDUB;
+			}
+			else if (b1 == 0x90 && b2 == 0x41)
+			{
+			type = APC40_BUTTON_DEVICE_METRONOME;
+			}
 			else if (b1 == 0xB0 && b2 == 0x10)
 			{
 				type = APC40_KNOB_DEVICE1;
@@ -380,23 +424,7 @@ public:
 				type = APC40_KNOB_DEVICE8;
 				value = b3;
 			}
-			else if (b1 == 0x90 && b2 == 0x3E) // Misc
-			{
-				type = APC40_BUTTON_DETAIL_VIEW;
-			}
-			else if (b1 == 0x90 && b2 == 0x3F)
-			{
-				type = APC40_BUTTON_REC_QUANTIZATION;
-			}
-			else if (b1 == 0x90 && b2 == 0x40)
-			{
-				type = APC40_BUTTON_MIDI_OVERDUB;
-			}
-			else if (b1 == 0x90 && b2 == 0x41)
-			{
-				type = APC40_BUTTON_METRONOME;
-			}
-			else if (b1 == 0x90 && b2 == 0x62)
+			else if (b1 == 0x90 && b2 == 0x62) // Misc
 			{
 				type = APC40_BUTTON_SHIFT;
 			}
@@ -508,7 +536,7 @@ public:
 
 		switch (type)
 		{
-		case APC40_MAIN_PAD:
+		case APC40_BUTTON_PAD:
 			if (x < 0 || x > 8 || y < 0 || y > 9)
 				return false;
 			
@@ -561,41 +589,64 @@ public:
 
 
 		case APC40_BUTTON_TRACK_PAN:
+			b1 = 0x90;
+			b2 = 0x57;
 			break;
 
 		case APC40_BUTTON_TRACK_SEND_A:
+			b1 = 0x90;
+			b2 = 0x58;
 			break;
 
 		case APC40_BUTTON_TRACK_SEND_B:
+			b1 = 0x90;
+			b2 = 0x59;
 			break;
 
 		case APC40_BUTTON_TRACK_SEND_C:
+			b1 = 0x90;
+			b2 = 0x5A;
 			break;
 
 
 		case APC40_BUTTON_DEVICE_CLIP_TRACK:
+			b1 = 0x90;
+			b2 = 0x3A;
 			break;
 
 		case APC40_BUTTON_DEVICE_TOGGLE:
+			b1 = 0x90;
+			b2 = 0x3B;
 			break;
 
 		case APC40_BUTTON_DEVICE_LEFT:
+			b1 = 0x90;
+			b2 = 0x3C;
 			break;
 
 		case APC40_BUTTON_DEVICE_RIGHT:
+			b1 = 0x90;
+			b2 = 0x3D;
 			break;
 
-
-		case APC40_BUTTON_DETAIL_VIEW:
+		case APC40_BUTTON_DEVICE_DETAIL_VIEW:
+			b1 = 0x90;
+			b2 = 0x3E;
 			break;
 
-		case APC40_BUTTON_REC_QUANTIZATION:
+		case APC40_BUTTON_DEVICE_REC_QUANTIZATION:
+			b1 = 0x90;
+			b2 = 0x3F;
 			break;
 
-		case APC40_BUTTON_MIDI_OVERDUB:
+		case APC40_BUTTON_DEVICE_MIDI_OVERDUB:
+			b1 = 0x90;
+			b2 = 0x40;
 			break;
 
-		case APC40_BUTTON_METRONOME:
+		case APC40_BUTTON_DEVICE_METRONOME:
+			b1 = 0x90;
+			b2 = 0x41;
 			break;
 		}
 
@@ -604,9 +655,18 @@ public:
 
 		std::vector<unsigned char> message;
 
-		message.push_back(b1);
-		message.push_back(b2);
-		message.push_back(static_cast<unsigned char>(value));
+		if (b1 >= 0x90 && b1 < 0xA0 && value == 0)
+		{
+			message.push_back(b1 - 0x10);
+			message.push_back(b2);
+			message.push_back(0);
+		}
+		else
+		{
+			message.push_back(b1);
+			message.push_back(b2);
+			message.push_back((unsigned int)value);
+		}
 
 		m_pRtMidiOut->sendMessage(&message);
 
