@@ -73,7 +73,7 @@ enum
 	APC40_KNOB_DEVICE8
 };
 
-enum eAPC40LEDModes
+enum 
 {
 	APC40_LED_MODE_OFF,
 	APC40_LED_MODE_GREEN,
@@ -85,11 +85,30 @@ enum eAPC40LEDModes
 	APC40_LED_MODE_ON = 127
 };
 
+enum 
+{
+	APC40_KNOB_MODE_OFF,
+	APC40_KNOB_MODE_SINGLE,
+	APC40_KNOB_MODE_VOLUME,
+	APC40_KNOB_MODE_PAN
+};
+
+enum
+{
+	APC40_IO_ALL = -1,
+	APC40_IO_IN = 0,
+	APC40_IO_OUT = 1
+};
+
+
+#define APC40_INPUT_TYPE_INVALID		-1 // For GetAPC40InputFromMidiMessage(Queue), invalid signal
+#define APC40_INPUT_TYPE_EMPTY			-2 // For GetAPC40InputFromMidiMessageQueue, queue is empty
+
 // ------------------------------------------------------------ Structs
 
 struct APC40Input
 {
-	int type;
+	int type = APC40_INPUT_TYPE_INVALID;
 	unsigned char x;
 	unsigned char y;
 	unsigned char value;
@@ -130,7 +149,7 @@ public:
 					m_nPortIn = i;
 					m_bFoundIn = true;
 
-					std::cout << "Found APC 40 Input (Port " << i << ")\n";
+					//std::cout << "Found APC 40 Input (Port " << i << ")\n";
 				}
 			}
 
@@ -152,7 +171,7 @@ public:
 					m_nPortOut = i;
 					m_bFoundOut = true;
 
-					std::cout << "Found APC 40 Output (Port " << i << ")\n";
+					//std::cout << "Found APC 40 Output (Port " << i << ")\n";
 				}
 			}
 
@@ -175,6 +194,9 @@ public:
 
 	void InitDevice(unsigned char mode = 0x42)
 	{
+		if (!m_bFoundOut)
+			return;
+
 		std::vector<unsigned char> message;
 
 		message.push_back(0xF0); // MIDI excl start
@@ -195,6 +217,9 @@ public:
 
 	void ResetLEDs(bool main_pad = true, bool track = true, bool device = true)
 	{
+		if (!m_bFoundOut)
+			return;
+
 		if (main_pad)
 		{
 			for (int x = 0; x < 9; x++)
@@ -227,15 +252,71 @@ public:
 		}
 	}
 
+	void ResetKnobs(bool track = true, bool device = true)
+	{
+		if (!m_bFoundOut)
+			return;
+
+		if (track)
+		{
+			this->SetKnobMode(APC40_KNOB_TRACK1, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_TRACK2, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_TRACK3, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_TRACK4, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_TRACK5, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_TRACK6, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_TRACK7, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_TRACK8, APC40_KNOB_MODE_OFF);
+		}
+
+		if (device)
+		{
+			this->SetKnobMode(APC40_KNOB_DEVICE1, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_DEVICE2, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_DEVICE3, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_DEVICE4, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_DEVICE5, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_DEVICE6, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_DEVICE7, APC40_KNOB_MODE_OFF);
+			this->SetKnobMode(APC40_KNOB_DEVICE8, APC40_KNOB_MODE_OFF);
+		}
+	}
+
 	void SetCallbackFunc(RtMidiIn::RtMidiCallback callback_func)
 	{
 		m_pRtMidiIn->setCallback(callback_func);
 		m_pRtMidiIn->ignoreTypes(false, false, false);
 	}
 
+	void CancelCallbackFunc()
+	{
+		m_pRtMidiIn->cancelCallback();
+	}
+
+	bool IsConnected(int io_type = APC40_IO_ALL)
+	{
+		if (io_type == APC40_IO_ALL && this->m_bFoundIn && this->m_bFoundOut)
+			return true;
+		else if (io_type == APC40_IO_IN && this->m_bFoundIn)
+			return true;
+		else if (io_type == APC40_IO_OUT && this->m_bFoundOut)
+			return true;
+
+		return false;
+	}
+
 	// ------- Input
 
-	APC40Input GetInputFromMIDIMessage(double deltatime, std::vector< unsigned char >* message)
+	APC40Input GetAPC40InputFromMidiMessageQueue()
+	{
+		std::vector <unsigned char> message;
+
+		double deltatime = m_pRtMidiIn->getMessage(&message);
+
+		return GetAPC40InputFromMIDIMessage(deltatime, &message);
+	}
+
+	APC40Input GetAPC40InputFromMIDIMessage(double deltatime, std::vector<unsigned char>* message)
 	{
 		unsigned int nBytes = message->size();
 
@@ -515,6 +596,10 @@ public:
 				type = APC40_SLIDER_CROSSFADE;
 			}
 		}
+		else if (nBytes == 0)
+		{
+			type = APC40_INPUT_TYPE_EMPTY;
+		}
 
 		APC40Input input;
 
@@ -531,6 +616,9 @@ public:
 
 	bool SetLEDMode(int type, int x, int y, int value)
 	{
+		if (!m_bFoundOut)
+			return false;
+
 		unsigned char b1 = 0;
 		unsigned char b2 = 0;
 
@@ -677,4 +765,357 @@ public:
 	{
 		return SetLEDMode(type, 0, 0, value);
 	}
+
+	bool SetKnobMode(int type, int value)
+	{
+		if (!m_bFoundOut)
+			return false;
+
+		unsigned char b2 = 0;
+
+		switch (type)
+		{
+		case APC40_KNOB_TRACK1:
+			b2 = 0x38;
+			break;
+		case APC40_KNOB_TRACK2:
+			b2 = 0x39;
+			break;
+		case APC40_KNOB_TRACK3:
+			b2 = 0x3A;
+			break;
+		case APC40_KNOB_TRACK4:
+			b2 = 0x3B;
+			break;
+		case APC40_KNOB_TRACK5:
+			b2 = 0x3C;
+			break;
+		case APC40_KNOB_TRACK6:
+			b2 = 0x3D;
+			break;
+		case APC40_KNOB_TRACK7:
+			b2 = 0x3E;
+			break;
+		case APC40_KNOB_TRACK8:
+			b2 = 0x3F;
+			break;
+		case APC40_KNOB_DEVICE1:
+			b2 = 0x18;
+			break;
+		case APC40_KNOB_DEVICE2:
+			b2 = 0x19;
+			break;
+		case APC40_KNOB_DEVICE3:
+			b2 = 0x1A;
+			break;
+		case APC40_KNOB_DEVICE4:
+			b2 = 0x1B;
+			break;
+		case APC40_KNOB_DEVICE5:
+			b2 = 0x1C;
+			break;
+		case APC40_KNOB_DEVICE6:
+			b2 = 0x1D;
+			break;
+		case APC40_KNOB_DEVICE7:
+			b2 = 0x1E;
+			break;
+		case APC40_KNOB_DEVICE8:
+			b2 = 0x1F;
+			break;
+		}
+
+		if (b2 == 0)
+			return false;
+
+		std::vector<unsigned char> message;
+
+		message.push_back(0xB0);
+		message.push_back(b2);
+		message.push_back((unsigned char)value);
+
+		m_pRtMidiOut->sendMessage(&message);
+
+		return true;
+	}
+
+	bool SetKnobValue(int type, int value)
+	{
+		if (!m_bFoundOut)
+			return false;
+
+		unsigned char b2 = 0;
+
+		switch (type)
+		{
+		case APC40_KNOB_TRACK1:
+			b2 = 0x30;
+			break;
+		case APC40_KNOB_TRACK2:
+			b2 = 0x31;
+			break;
+		case APC40_KNOB_TRACK3:
+			b2 = 0x32;
+			break;
+		case APC40_KNOB_TRACK4:
+			b2 = 0x33;
+			break;
+		case APC40_KNOB_TRACK5:
+			b2 = 0x34;
+			break;
+		case APC40_KNOB_TRACK6:
+			b2 = 0x35;
+			break;
+		case APC40_KNOB_TRACK7:
+			b2 = 0x36;
+			break;
+		case APC40_KNOB_TRACK8:
+			b2 = 0x37;
+			break;
+		case APC40_KNOB_DEVICE1:
+			b2 = 0x10;
+			break;
+		case APC40_KNOB_DEVICE2:
+			b2 = 0x11;
+			break;
+		case APC40_KNOB_DEVICE3:
+			b2 = 0x12;
+			break;
+		case APC40_KNOB_DEVICE4:
+			b2 = 0x13;
+			break;
+		case APC40_KNOB_DEVICE5:
+			b2 = 0x14;
+			break;
+		case APC40_KNOB_DEVICE6:
+			b2 = 0x15;
+			break;
+		case APC40_KNOB_DEVICE7:
+			b2 = 0x16;
+			break;
+		case APC40_KNOB_DEVICE8:
+			b2 = 0x17;
+			break;
+		}
+
+		if (b2 == 0)
+			return false;
+
+		std::vector<unsigned char> message;
+
+		message.push_back(0xB0);
+		message.push_back(b2);
+		message.push_back((unsigned char)value);
+
+		m_pRtMidiOut->sendMessage(&message);
+
+		return true;
+	}
+
+	int GetKnobValueScaled(int knob_value, int min, int max)
+	{
+		return min + knob_value * (max - min) / 127;
+	}
+
+	float GetKnobValueScaled(int knob_value, float min, float max)
+	{
+		return min + ((float)knob_value * (max - min) / 127.0f);
+	}
+
+	int GetKnobValueLEDCount(int knob_value, int knob_mode)
+	{
+		switch (knob_mode)
+		{
+		case APC40_KNOB_MODE_SINGLE:
+			return 1;
+
+		case APC40_KNOB_MODE_VOLUME:
+			if (knob_value < 1) return 0;
+			if (knob_value < 10) return 1;
+			if (knob_value < 19) return 2;
+			if (knob_value < 28) return 3;
+			if (knob_value < 37) return 4;
+			if (knob_value < 46) return 5;
+			if (knob_value < 55) return 6;
+			if (knob_value < 64) return 7;
+			if (knob_value < 72) return 8;
+			if (knob_value < 81) return 9;
+			if (knob_value < 90) return 10;
+			if (knob_value < 99) return 11;
+			if (knob_value < 108) return 12;
+			if (knob_value < 117) return 13;
+			if (knob_value < 127) return 14;
+			return 15;
+
+		case APC40_KNOB_MODE_PAN:
+			if (knob_value < 9) return -7;
+			if (knob_value < 18) return -6;
+			if (knob_value < 27) return -5;
+			if (knob_value < 36) return -4;
+			if (knob_value < 45) return -3;
+			if (knob_value < 54) return -2;
+			if (knob_value < 63) return -1;
+			if (knob_value < 65) return 0;
+			if (knob_value < 74) return 1;
+			if (knob_value < 83) return 2;
+			if (knob_value < 92) return 3;
+			if (knob_value < 101) return 4;
+			if (knob_value < 110) return 5;
+			if (knob_value < 119) return 6;
+			return 7;
+		}
+
+		return 0;
+	}
+
+	bool SetKnobValueLEDCount(int type, int knob_mode, int count) // Only for Volume and Pan. Pan ranges from -7 to 7
+	{
+		constexpr int volume_values[16] = { 0, 5, 14, 23, 32, 41, 50, 59, 68, 76, 85, 94, 103, 112, 121, 127 };
+		constexpr int pan_values[15] = { 4, 13, 22, 31, 40, 59, 58, 63, 69, 78, 87, 96, 105, 114, 123 };
+
+		switch (knob_mode)
+		{
+		case APC40_KNOB_MODE_VOLUME:
+			if (count < 0)
+				count = 0;
+			else if (count > 15)
+				count = 15;
+			this->SetKnobValue(type, volume_values[count]);
+			return true;
+
+		case APC40_KNOB_MODE_PAN:
+			count += 7;
+			if (count < 0)
+				count = 0;
+			else if (count > 14)
+				count = 14;
+			this->SetKnobValue(type, pan_values[count]);
+			return true;
+		}
+
+		return false;
+	}
+
+	void SetKnobValueScaled(int type, int knob_mode, int min, int max, int value, int min_value, int max_value)
+	{
+		int knob_value;
+		int led_count;
+
+		switch (knob_mode)
+		{
+		case APC40_KNOB_MODE_SINGLE:
+			knob_value = (value - min_value) * 127 / (max_value - min_value);
+			SetKnobValue(type, knob_value);
+			break;
+
+		case APC40_KNOB_MODE_VOLUME:
+		case APC40_KNOB_MODE_PAN:
+			knob_value = (value - min_value) * 127 / (max_value - min_value);
+			led_count = GetKnobValueLEDCount(knob_value, knob_mode);
+
+			if (led_count < min)
+				led_count = min;
+			else if (led_count > max)
+				led_count = max;
+
+			SetKnobValueLEDCount(type, knob_mode, led_count);
+			break;
+		}
+	}
+
+	void SetKnobValueScaled(int type, int knob_mode, int min, int max, float value, float min_value, float max_value)
+	{
+		int knob_value;
+		int led_count;
+
+		switch (knob_mode)
+		{
+		case APC40_KNOB_MODE_SINGLE:
+			knob_value = (int)((value - min_value) * 127.0f / (max_value - min_value));
+			SetKnobValue(type, knob_value);
+			break;
+
+		case APC40_KNOB_MODE_VOLUME:
+		case APC40_KNOB_MODE_PAN:
+			knob_value = (int)((value - min_value) * 127.0f / (max_value - min_value));
+			led_count = GetKnobValueLEDCount(knob_value, knob_mode);
+
+			if (led_count < min)
+				led_count = min;
+			else if (led_count > max)
+				led_count = max;
+
+			SetKnobValueLEDCount(type, knob_mode, led_count);
+			break;
+		}
+	}
+
+	void HandleKnobValueScaled(int type, int knob_value, int knob_mode, int min, int max, int& output, int min_value, int max_value) // min/max are LED counts!
+	{
+		switch (knob_mode)
+		{
+		case APC40_KNOB_MODE_SINGLE:
+			output = GetKnobValueScaled(knob_value, min_value, max_value);
+			SetKnobValue(type, knob_value);
+			break;
+
+		case APC40_KNOB_MODE_VOLUME:
+		case APC40_KNOB_MODE_PAN:
+			int led_count = GetKnobValueLEDCount(knob_value, knob_mode);
+
+			output = (int)((float)(max_value - min_value) * ((float)led_count / (float)(max - min)));
+
+			if (led_count < min || output < min_value)
+			{
+				output = min_value;
+				led_count = min;
+				SetKnobValueLEDCount(type, knob_mode, led_count);
+			}
+			else if (led_count > max || output > max_value)
+			{
+				output = max_value;
+				led_count = max;
+				SetKnobValueLEDCount(type, knob_mode, led_count);
+			}
+			else
+			{
+				SetKnobValue(type, knob_value);
+			}
+		}
+	}
+
+	void HandleKnobValueScaled(int type, int knob_value, int knob_mode, int min, int max, float& output, float min_value, float max_value) // min/max are LED counts!
+	{
+		switch (knob_mode)
+		{
+		case APC40_KNOB_MODE_SINGLE:
+			output = GetKnobValueScaled(knob_value, min_value, max_value);
+			SetKnobValue(type, knob_value);
+			break;
+
+		case APC40_KNOB_MODE_VOLUME:
+		case APC40_KNOB_MODE_PAN:
+			int led_count = GetKnobValueLEDCount(knob_value, knob_mode);
+
+			output = (max_value - min_value) * ((float)led_count / (float)(max - min));
+
+			if (led_count < min || output < min_value)
+			{
+				output = min_value;
+				led_count = min;
+				SetKnobValueLEDCount(type, knob_mode, led_count);
+			}
+			else if (led_count > max || output > max_value)
+			{
+				output = max_value;
+				led_count = max;
+				SetKnobValueLEDCount(type, knob_mode, led_count);
+			}
+			else
+			{
+				SetKnobValue(type, knob_value);
+			}
+		}
+	}
+
 };
