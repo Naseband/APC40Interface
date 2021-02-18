@@ -2,7 +2,7 @@
 
 /*
 
-APC40 Interface Library (c) 2020 
+APC40 Interface Library
 
 */
 
@@ -104,25 +104,35 @@ enum
 #define APC40_INPUT_TYPE_INVALID		-1 // For GetAPC40InputFromMidiMessage(Queue), invalid signal
 #define APC40_INPUT_TYPE_EMPTY			-2 // For GetAPC40InputFromMidiMessageQueue, queue is empty
 
-// ------------------------------------------------------------ Structs
+// ------------------------------------------------------------ Structs and Enums
 
 struct APC40Input
 {
 	int type = APC40_INPUT_TYPE_INVALID;
-	unsigned char x;
-	unsigned char y;
-	unsigned char value;
-	bool pressed;
+	unsigned char x = 0;
+	unsigned char y = 0;
+	unsigned char value = 0;
+	bool pressed = false;
+};
+
+enum class APC40ErrorCode : unsigned int
+{
+	ERRCODE_MIDI_IN, ERRCODE_MIDI_OUT
+};
+
+struct APC40Error
+{
+	APC40ErrorCode eErrCode;
+	char* szText = NULL;
 };
 
 // ------------------------------------------------------------ 
 
-//template <>
 class APC40Interface 
 {
 private:
-	RtMidiIn* m_pRtMidiIn = 0;
-	RtMidiOut* m_pRtMidiOut = 0;
+	RtMidiIn* m_pRtMidiIn = NULL;
+	RtMidiOut* m_pRtMidiOut = NULL;
 
 	bool m_bFoundIn = false;
 	bool m_bFoundOut = false;
@@ -130,13 +140,17 @@ private:
 	unsigned int m_nPortIn = 0;
 	unsigned int m_nPortOut = 0;
 
+	unsigned char m_nLEDStates[8][10] = { APC40_LED_MODE_OFF };
+
+	std::vector<APC40Error> m_vecErrorList;
+
 public:
 	APC40Interface()
 	{
 		try
 		{
 			m_pRtMidiIn = new RtMidiIn();
-			m_pRtMidiOut = new RtMidiOut();
+			m_bFoundIn = false;
 
 			unsigned int nPorts = m_pRtMidiIn->getPortCount();
 
@@ -148,8 +162,6 @@ public:
 				{
 					m_nPortIn = i;
 					m_bFoundIn = true;
-
-					//std::cout << "Found APC 40 Input (Port " << i << ")\n";
 				}
 			}
 
@@ -157,10 +169,29 @@ public:
 			{
 				m_pRtMidiIn->openPort(m_nPortIn);
 			}
+		}
+		catch (RtMidiError& error)
+		{
+			auto errtext = error.getMessage();
+			auto len = errtext.length();
+			auto tmp = new char[len + 1];
+			errtext.copy(tmp, len);
+			tmp[len] = 0;
 
-			// ---
+			APC40Error new_error;
 
-			nPorts = m_pRtMidiOut->getPortCount();
+			new_error.eErrCode = APC40ErrorCode::ERRCODE_MIDI_IN;
+			new_error.szText = tmp;
+
+			m_vecErrorList.push_back(new_error);
+		}
+
+		try
+		{
+			m_pRtMidiOut = new RtMidiOut();
+			m_bFoundOut = false;
+
+			unsigned int nPorts = m_pRtMidiOut->getPortCount();
 
 			for (unsigned i = 0; i < nPorts; i++)
 			{
@@ -170,8 +201,6 @@ public:
 				{
 					m_nPortOut = i;
 					m_bFoundOut = true;
-
-					//std::cout << "Found APC 40 Output (Port " << i << ")\n";
 				}
 			}
 
@@ -182,14 +211,35 @@ public:
 		}
 		catch (RtMidiError& error)
 		{
-			error.printMessage();
+			auto errtext = error.getMessage();
+			auto len = errtext.length();
+			auto tmp = new char[len + 1];
+			errtext.copy(tmp, len);
+			tmp[len] = 0;
+
+			APC40Error new_error;
+
+			new_error.eErrCode = APC40ErrorCode::ERRCODE_MIDI_OUT;
+			new_error.szText = tmp;
+
+			m_vecErrorList.push_back(new_error);
 		}
 	}
 
 	~APC40Interface()
 	{
-		delete m_pRtMidiIn;
-		delete m_pRtMidiOut;
+		for (size_t i = 0U, s = m_vecErrorList.size(); i < s; ++i)
+		{
+			delete[] m_vecErrorList[i].szText;
+		}
+
+		m_vecErrorList.clear();
+
+		if(m_pRtMidiIn != NULL)
+			delete m_pRtMidiIn;
+
+		if(m_pRtMidiOut != NULL)
+			delete m_pRtMidiOut;
 	}
 
 	void InitDevice(unsigned char mode = 0x42)
@@ -203,7 +253,7 @@ public:
 		message.push_back(0x47); // Manu ID
 		message.push_back(0x7F); // DevID
 		message.push_back(0x73); // Prod Model ID
-		message.push_back(0x60); // Msg Type ID (0x60=Init?)
+		message.push_back(0x60); // Msg Type ID (0x60=Init)
 		message.push_back(0x00); // Num Data Bytes (most sign.)
 		message.push_back(0x04); // Num Data Bytes (least sign.)
 		message.push_back(mode); // Device Mode (0x40=unset, 0x41=Ableton, 0x42=Ableton with full ctrl)
@@ -616,9 +666,6 @@ public:
 
 	bool SetLEDMode(int type, int x, int y, int value)
 	{
-		if (!m_bFoundOut)
-			return false;
-
 		unsigned char b1 = 0;
 		unsigned char b2 = 0;
 
@@ -673,6 +720,7 @@ public:
 				b1 = 0x90 + x;
 				b2 = 0x30;
 			}
+			m_nLEDStates[x][y] = (unsigned char)value;
 			break;
 
 
@@ -738,7 +786,7 @@ public:
 			break;
 		}
 
-		if (b1 == 0)
+		if (!m_bFoundOut || b1 == 0)
 			return false;
 
 		std::vector<unsigned char> message;
@@ -764,6 +812,53 @@ public:
 	bool SetLEDMode(int type, int value)
 	{
 		return SetLEDMode(type, 0, 0, value);
+	}
+
+	void GetLEDStates(unsigned char (&led_states)[8][10])
+	{
+		for (int x = 0; x < 8; ++x)
+			for (int y = 0; y < 10; ++y)
+				led_states[x][y] = m_nLEDStates[x][y];
+	}
+
+	bool GetLEDCircularPos(int pos, int *x, int *y)
+	{
+		if (pos < 0 || pos >= 32)
+			return false;
+
+		if (pos >= 0 && pos <= 7) // Horizontal Top
+		{
+			*x = pos;
+			*y = 0;
+		}
+		else if (pos >= 16 && pos <= 23) // Horizontal Bottom
+		{
+			*x = 7 - (pos - 16);
+			*y = 9;
+		}
+		else if (pos >= 7 && pos <= 16) // Vertical Right
+		{
+			*x = 7;
+			*y = pos - 7;
+		}
+		else if (pos >= 23 && pos <= 31) // Vertical Left
+		{
+			*x = 0;
+			*y = 9 - (pos - 23);
+		}
+
+		return true;
+	}
+
+	bool IsValidLEDPos(int x, int y, bool allow_scene = true)
+	{
+		if (allow_scene && x == 8 && y >= 0 && y < 7)
+			return true;
+
+		if (x < 0 || x > 7 || y < 0 || y > 9)
+			return false;
+
+		return true;
 	}
 
 	bool SetKnobMode(int type, int value)
@@ -1063,7 +1158,8 @@ public:
 		case APC40_KNOB_MODE_PAN:
 			int led_count = GetKnobValueLEDCount(knob_value, knob_mode);
 
-			output = (int)((float)(max_value - min_value) * ((float)led_count / (float)(max - min)));
+			output = (max_value - min_value) * led_count / (max - min);
+			//output = (int)((float)(max_value - min_value) * ((float)led_count / (float)(max - min)));
 
 			if (led_count < min || output < min_value)
 			{
@@ -1118,4 +1214,20 @@ public:
 		}
 	}
 
+	bool PopError(APC40ErrorCode& errcode, char* text, size_t size)
+	{
+		if (m_vecErrorList.size() == 0)
+			return false;
+
+		errcode = m_vecErrorList[0].eErrCode;
+		
+		text[0] = 0;
+		strcat_s(text, size, m_vecErrorList[0].szText);
+
+		delete[] m_vecErrorList[0].szText;
+
+		m_vecErrorList.erase(m_vecErrorList.begin());
+
+		return true;
+	}
 };
