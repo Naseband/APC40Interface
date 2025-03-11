@@ -9,7 +9,7 @@ Since version 2, this library is no longer responsible for sending midi messages
 It merely keeps track of the APC40's state and generates a midi buffer for you to send to the device, aswell as convert raw midi input you receive from your midi library to APC40 relevant messages.
 Output messages are generated only if the state of a control changed from the previous state.
 
-All devices buttons, LEDs, knobs, etc. are uniquely identified by a control identifier.
+All device buttons, LEDs, knobs, etc. are uniquely identified by a control identifier.
 
 In addition, some controls are grouped together and have an extra id or coordinate.
 These ids/coordnates are packed into the eAPC40Control value (meaning they are offset from the base value).
@@ -19,14 +19,16 @@ These are:
 - Volume Sliders (id 0-8, where 8 is the Master slider)
 - Track Knobs (id 0-7)
 - Device Knobs (id 0-7)
-- Pad (X coordinates/columns 0-8 and Y coordinates/rows 0-9, where column 8 is the scene launch column)
+- Pad (X coordinates/columns 0-8 and Y coordinates/rows 0-9)
+
+Note that column 8 of the pad (the scene launch column) has only 6 valid LEDs, the MASTER button LED cannot be set (its input does still work).
 
 There are helper functions to pack/unpack or strip the ID/coordinates of eAPC40Control identifiers.
 
 To set the value of track knob 1, you can pack the id into the eAPC40Control identifier:
 
 ```cpp
-eAPC40Control packed_control = APC40PackControl(eAPC40Control::TrackKnobValue, 1); // Knob 1 = second know (they start at 0)
+eAPC40Control packed_control = APC40PackControl(eAPC40Control::TrackKnobValue, 1); // Knob 1 = second knob (they start at 0)
 
 APC40Interface apc40;
 apc40.SetControlValue(packed_control, 127); // Update the state
@@ -101,6 +103,14 @@ The APC40 will also send a bunch of input messages, which are related to the cur
 If you want to utilize these initial slider values, you should make sure to have your input callback/queue connected before sending the initialization message.
 
 If the APC40 is disconnected and reconnected you will also have to clear the current state of the interface, so that the desired state can be synced correctly with the APC40. See APC40Interface::ResetCurrentState().
+
+# Midi libraries
+
+There are various midi libraries, they should all work well with the interface. You do however need a library that supports SysEx messages.
+
+On Windows, I would strongly recommend either using the winrt midi functions or use WinMM directly (SendLongMessage for all types of messages).
+
+Most libraries (such as libremidi, RtMidi, etc) use WinMM's SendShortMsg as a backend on Windows which is heavily throttled on Win10 and Win11 unless you are really far behind on updates.
 
 # Examples
 
